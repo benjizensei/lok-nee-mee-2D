@@ -1,0 +1,11 @@
+Perseus — the quest you can't cancel (เพอร์ซิอุส: เควสที่กดยกเลิกไม่ได้)
+Story: Greek myth of Perseus (public domain, after Apollodorus' Library and Ovid's Metamorphoses).
+
+Picture: all sets, sprites, items and UI drawn in code (three.js r170, MIT). No images or footage.
+Fonts (SIL Open Font License 1.1, Google Fonts, self-hosted in fonts/):
+  Trirong — Cadson Demak
+  Taviraj — Cadson Demak
+  Cinzel — Natanael Gama
+Music and sound: synthesized in code (numpy/scipy; waveguide strings from the library's core/audio/pluck.py). No samples.
+Guide voice: eSpeak NG (GPL-3.0) via the espeakng-loader wheel, used only to make the guide narration WAVs;
+  replace with your own recording (VOICE_SCRIPT.md).
