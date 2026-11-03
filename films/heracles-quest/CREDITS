@@ -1,0 +1,6 @@
+Heracles — the penance quests that did not count (เฮราคลีส: เควสไถ่บาปที่นับไม่ครบ)
+Story: Greek myth of Heracles and his labours (public domain, after Apollodorus' Library).
+Narration: the user's own recording.
+Picture: all sets, sprites, monsters, effects and UI drawn in code (three.js r170, MIT). No images or footage.
+Fonts (SIL Open Font License 1.1, Google Fonts, self-hosted in fonts/): Trirong, Taviraj (Cadson Demak), Cinzel (Natanael Gama).
+Music and sound: synthesized in code (numpy/scipy; waveguide strings from the library's core/audio/pluck.py). No samples.
