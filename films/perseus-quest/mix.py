@@ -215,11 +215,17 @@ for v in VO:
     add(vox, x, v['t'], 1, 0, raw=True)
 # duck music by ~10 dB under the voice (down only)
 from scipy.ndimage import uniform_filter1d
-env = uniform_filter1d(np.abs(vox[:, 0]), int(.25 * SR)); duck = 1 - .68 * np.clip(env / .05, 0, 1)
+env = uniform_filter1d(np.abs(vox[:, 0]), int(.25 * SR)); duck = 1 - .8 * np.clip(env / .05, 0, 1)
 duck = uniform_filter1d(duck, int(.15 * SR))
 
 mus = reverb(mus, 2.6, .35); fol = reverb(fol, 1.4, .18)
-mix = mus * duck[:, None] * .55 + amb * .5 + fol * .7 + vox * 1.0
+MG, AG, FG = float(os.environ.get('MG', .3)), float(os.environ.get('AG', .25)), float(os.environ.get('FG', .45))
+duck2 = 1 - .5 * np.clip(env / .05, 0, 1); duck2 = uniform_filter1d(duck2, int(.15 * SR))   # sfx/ambience dip under the voice too
+bedmix = mus * duck[:, None] * MG + (amb * AG + fol * FG) * duck2[:, None]
+act = env > .02
+db = lambda a: 20 * np.log10(np.sqrt((a ** 2).mean()) + 1e-12)
+print(f'voice vs bed while speaking: {db(vox[act]) - db(bedmix[act]):.1f} dB  (music {db(vox[act]) - db(mus[act] * duck[act, None] * MG):.1f}, sfx {db(vox[act]) - db(fol[act] * FG * duck2[act, None]):.1f}, amb {db(vox[act]) - db(amb[act] * AG * duck2[act, None]):.1f})')
+mix = bedmix + vox * 1.0
 for c in range(2): mix[:, c] = X.limit(mix[:, c], .8)
 mix = mix[:int(DUR * SR)]
 os.makedirs(os.path.join(HERE, 'out'), exist_ok=True)
