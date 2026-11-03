@@ -197,14 +197,14 @@ function blackout(t) {
   a = Math.max(a, 1 - ss(seg(t, 0, .35)), ss(seg(t, 100.8, 101.5)));
   if (a > 0) { g.fillStyle = `rgba(0,0,0,${a})`; g.fillRect(0, 0, W, H); }
 }
-export function drawOverlay(t, shot) {
+export function drawOverlay(t, shot, tf = t) {
   g.clearRect(0, 0, W, H); TXT.length = 0;
   rewindUI(t, shot); bossUI(t, shot); warn(t, shot); statusWin(t); questWin(t); lootList(t);
   toast(t, T.drop, 60.6, 'ไอเทมดรอป ★', 'เพกาซัส  ม้าบิน', '#ffd36a', 880);
   toast(t, T.partyJoin, 72.6, 'ปาร์ตี้', 'แอนโดรเมด้า เข้าร่วมปาร์ตี้', '#9fd8ff');
   toast(t, T.kingStone + .3, 77.5, 'ส่งเควสแล้ว ✓', 'หัวของกอร์กอน');
   complete(t); chapter(t);
-  for (const v of VO) { if (v.dlg) dialog(t, v); else subtitle(t, v); }
+  for (const v of VO) { if (v.dlg) dialog(tf, v); else subtitle(tf, v); }
   title(t);
   blackout(t);
 }

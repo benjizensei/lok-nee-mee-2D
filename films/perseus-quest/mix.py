@@ -9,7 +9,13 @@ sys.path.insert(0, os.path.join(LIB, 'core/audio'))
 import sfx as X
 import pluck as P
 SR = X.SR
-S = json.load(open(os.path.join(HERE, 'out/story.json'))); T = S['T']; VO = S['VO']; DUR = S['DUR']
+S = json.load(open(os.path.join(HERE, 'out/story.json'))); T = S['T']; VO = S['VO']; DUR = S['DUR_FILM']
+# time warp: the score/foley are written on the shots' animation clock ("orig"); F() maps to film seconds
+SH = S['SHOTS']
+def _shot(to): return next((s for s in SH if to < s['b']), SH[-1])
+def FW(to): s = _shot(to); return s['fa'] + (min(to, s['b']) - s['a']) * s['fl'] / (s['b'] - s['a'])
+def scl(to): s = _shot(to); return s['fl'] / (s['b'] - s['a'])
+SC = 1.0   # stretch for sustained notes in the current section
 VD = json.load(open(os.path.join(HERE, 'voices/dur.json')))
 N = int(DUR * SR) + SR
 rng = np.random.default_rng(5)
@@ -28,11 +34,13 @@ def M(name): return P.midi(name)
 
 # —— instruments ——
 def strings(m, d, v=.5, bright=1800):
+    d = d * SC
     x = sum(saw(hz(m), d, det) for det in (-.004, 0, .0035, .007)) / 4
     x = lp(x, bright) * adsr(d, .6, .8); vib = 1 + .002 * np.sin(2 * np.pi * 5 * tt(d)); return x * v
 def trem(m, d, v=.5):
     x = strings(m, d, v, 2600); am = .55 + .45 * np.abs(np.sin(np.pi * 12 * tt(d))); return x * am
 def choir(m, d, v=.5, vowel='a'):
+    d = d * SC
     F = {'a': [(700, 1.0), (1150, .5), (2700, .25)], 'o': [(450, 1.0), (800, .5), (2830, .15)], 'm': [(300, 1.0), (1000, .2), (2500, .05)]}[vowel]
     src = sum(saw(hz(m) * (1 + .003 * np.sin(2 * np.pi * (4.6 + k * .7) * tt(d) + k)), d, k * .002) for k in range(3)) / 3
     x = sum(bp(src, f * .85, f * 1.15) * g for f, g in F); return x * adsr(d, .8, 1.0) * v * 2.2
@@ -61,7 +69,8 @@ def chime_ui(v=.5, up=True):
     out = np.zeros(int(.9 * SR))
     for i, m in enumerate((79, 84, 88) if up else (88, 84)): c = celesta(m, .8, .7); s = int(i * .07 * SR); out[s:s + len(c)] += c[:len(out) - s]
     return out * v
-def add(buf, x, at, g=1.0, pan=0.0):
+def add(buf, x, at, g=1.0, pan=0.0, raw=False):
+    if not raw: at = FW(at)
     if x.ndim == 1: X.add(buf, x, at, g, pan)
     else:
         s = int(at * SR); e = min(len(buf), s + len(x)); buf[s:e] += x[:e - s] * g
@@ -76,6 +85,7 @@ def reverb(x, sec=2.2, wet=.3, damp=4000):
 
 # ================= SCORE =================
 Dm, Bb, F, C, Gm, A = [50, 53, 57], [46, 50, 53], [53, 57, 60], [48, 52, 55], [55, 58, 62], [45, 49, 52]
+SC = scl(0)
 # A: cave (0–6.2) — drone, hum, timpani roll crescendo, hard stop into the rewind
 for m in (38, 45): add(mus, strings(m, 6.4, .35, 600), 0, 1, -.2 if m == 38 else .2)
 for m, p in ((62, -.3), (65, 0), (69, .3)): add(mus, choir(m, 6.2, .18, 'm'), .2, 1, p)
@@ -85,31 +95,32 @@ add(mus, timp(38, .9), 5.9, 1)
 t = tt(1.4); f = 300 * np.exp(-t * 1.6); add(fol, np.sin(2 * np.pi * np.cumsum(f) / SR) * .25 * (1 - t / 1.4) + bp(rng.standard_normal(len(t)), 400, 2400) * .15 * (1 - t / 1.4), 6.2, 1)
 # B: beach (7.6–19) — harp arpeggios over i–VI–III–VII
 prog = [Dm, Bb, F, C]
-t0 = 7.6
+t0 = 7.6; SC = scl(t0)
 for bar in range(4):
     ch = prog[bar % 4]; tb = t0 + bar * 4 * BEAT
     add(mus, strings(ch[0] - 12, 4 * BEAT + .4, .16, 900), tb, 1, -.2)
     for k in range(8): m = ch[k % 3] + 12 * (k // 3); add(mus, harp(m + 12, 2.5, .45 + .1 * (k == 0)), tb + k * BEAT / 2, .9, -.3 + k * .08)
 # C: palace (19–30.8) — horn line + frame drum
-t0 = 19.0
+t0 = 19.0; SC = scl(t0)
 for b in range(int(11.8 / BEAT)):
     add(mus, frame_drum(.45 if b % 2 == 0 else .25, b % 2 == 0), t0 + b * BEAT, 1, .1)
 for (m, st, d) in [(50, 0, 2), (53, 2, 1), (52, 3, 1), (50, 4, 3), (57, 8, 2), (55, 10, 1), (53, 11, 1), (52, 12, 2), (50, 14, 3)]:
     add(mus, horn(m, d * BEAT + .1, .42), t0 + 1.2 + st * BEAT, 1, -.15)
 for b, ch in enumerate([Dm, Gm, Dm, A]): add(mus, strings(ch[0] - 12, 4 * BEAT * 1.0 + .3, .14, 700), t0 + b * 4 * BEAT * .98, 1, .2)
 # D: temple (30.8–42.6) — harp + celesta, F major brightness, each item on its chime
-t0 = 30.8
+t0 = 30.8; SC = scl(t0)
 for bar, ch in enumerate([F, C, Dm, Bb]):
     tb = t0 + bar * 4 * BEAT
     add(mus, strings(ch[0], 4 * BEAT + .5, .12, 1600), tb, 1, .2)
     for k in range(4): add(mus, harp(ch[k % 3] + 12, 2.5, .4), tb + k * BEAT, .8, -.2)
 for i, ti in enumerate(T['items']): add(mus, celesta(72 + [0, 2, 4, 7, 9][i] + 12, 2.0, .7), ti, 1, (i - 2) * .25); add(fol, chime_ui(.4), ti + .05, 1, 0)
 add(mus, celesta(84, 3, .8), 39.4, 1); add(mus, celesta(88, 3, .6), 39.47, 1); add(mus, celesta(91, 3, .5), 39.54, 1)
+SC = 1.0
 # A': back in the cave (42.6–54.0) — drone, tremolo rising, then silence
 for m in (38, 45): add(mus, strings(m, 11.6, .32, 650), 42.6, 1)
 for i, m in enumerate([62, 63, 65, 67]): add(mus, trem(m, 11.4 - i * 2.4, .07 + .03 * i), 42.6 + i * 2.4, 1, -.3 + .2 * i)
 for b in range(int(11 / (BEAT / 2))): tm = 43 + b * BEAT / 2
-mus[int(54.0 * SR):int(55.0 * SR)] *= np.linspace(1, 0, int(1.0 * SR))[:, None] ** 3 * 0 + np.linspace(1, 0, int(1.0 * SR))[:, None] * 0
+mus[int(FW(54.0) * SR):int(FW(55.0) * SR)] = 0
 add(fol, X.heartbeat(.9), T['breathe'], .9)
 # 55.0 slash → silence → 56.1 boom + shimmer + choir in D major
 add(fol, X.whoosh(.25, 1), T['slash'] - .12, .9, .2)
@@ -121,15 +132,16 @@ for m in (50, 57): add(mus, strings(m, 6.0, .2, 2200), T['pegasus'] + .2, 1)
 for k in range(6): add(fol, X.whoosh(.3, .4), T['pegasus'] + .5 + k * .55, .35, .3)   # wings
 add(fol, chime_ui(.55), T['drop'], 1)
 # E: storm (62.4–72.8) — timpani + string ostinato
-t0 = 62.4
+t0 = 62.4; SC = scl(t0)
 for b in range(int(10.4 / (BEAT / 2))):
     tm = t0 + b * BEAT / 2; ch = [Dm, Dm, Bb, A][(b // 8) % 4]
-    add(mus, strings(ch[b % 3] + 12, BEAT / 2 + .05, .09, 3000) * adsr(BEAT / 2 + .05, .01, .08), tm, 1, .3 if b % 2 else -.3)
+    add(mus, (lambda y: y * adsr(len(y) / SR, .01, .08))(strings(ch[b % 3] + 12, BEAT / 2 + .05, .09, 3000)), tm, 1, .3 if b % 2 else -.3)
     if b % 4 == 0: add(mus, timp(38 if (b // 8) % 4 != 3 else 45, .55), tm, 1)
 for b, ch in enumerate([Dm, Bb, Dm, A]): add(mus, horn(ch[0] - 12, 4 * BEAT * .6, .3), t0 + b * 4 * BEAT * .62 + .3, 1)
-mus[int(68.4 * SR):int(68.9 * SR)] *= .3
+mus[int(FW(68.4) * SR):int(FW(68.9) * SR)] *= .3
 add(mus, bell(50, .6), T['petrifyCetus'], 1)
 add(fol, chime_ui(.5), T['partyJoin'], 1)
+SC = 1.0
 # C': stone king (72.8–77.8) — comic pizzicato
 for i, (m, st) in enumerate([(50, 0), (57, .5), (50, 1), (57, 1.5), (53, 2.5), (52, 3), (50, 3.5), (45, 4.5)]):
     add(mus, pizz(m - 12 if i % 2 == 0 else m, .7), 73.0 + st * BEAT, 1, -.2 + i * .05)
@@ -137,8 +149,8 @@ add(fol, chime_ui(.45), T['kingStone'] + .3, 1)
 # F: games (77.8–83.8) — bright pad, then hard stop at the hit
 for ch, tb in ((F, 77.8), (C, 80.6)): [add(mus, strings(m, 2.9, .1, 2400), tb, 1, (k - 1) * .3) for k, m in enumerate(ch)]
 for k in range(10): add(mus, harp(F[k % 3] + 24, 2, .3), 78 + k * BEAT / 2, .6)
-mus[int(T['hit'] * SR):int((T['hit'] + .25) * SR)] *= np.linspace(1, 0, int(.25 * SR))[:, None]
-mus[int((T['hit'] + .25) * SR):int(86.5 * SR)] = 0
+h0 = int(FW(T['hit']) * SR); mus[h0:h0 + int(.25 * SR)] *= np.linspace(1, 0, int(.25 * SR))[:, None]
+mus[h0 + int(.25 * SR):int(FW(86.5) * SR)] = 0
 # complete: low bell + slow minor "fanfare"
 add(mus, bell(38, .9, 6), T['complete'], 1)
 for i, m in enumerate([62, 65, 69, 74]): add(mus, horn(m - 12, 2.0 - i * .2, .26), T['complete'] + .6 + i * .55, 1)
@@ -151,7 +163,7 @@ add(mus, choir(62, 5.5, .18, 'a'), 96.0, 1, -.2); add(mus, choir(69, 5.5, .14, '
 
 # ================= AMBIENCE (per set, crossfaded) =================
 def bed(kind, a, b, g):
-    d = b - a + 1.0; n = int(d * SR); x = np.zeros(n); t = np.arange(n) / SR; r = np.random.default_rng(hash(kind) % 1000)
+    d = FW(b) - FW(a) + 1.0; n = int(d * SR); x = np.zeros(n); t = np.arange(n) / SR; r = np.random.default_rng(hash(kind) % 1000)
     if kind == 'cave': x = lp(r.standard_normal(n), 300) * .25 * (1 + .3 * np.sin(2 * np.pi * .1 * t))
     if kind == 'sea': x = lp(r.standard_normal(n), 900) * (.25 + .2 * np.sin(2 * np.pi * t / 6.5) ** 2)
     if kind == 'hall': x = lp(r.standard_normal(n), 250) * .12 + bp(r.standard_normal(n), 1500, 5000) * .02 * (r.random(n) > .996)
@@ -160,7 +172,7 @@ def bed(kind, a, b, g):
     if kind == 'crowd': x = bp(r.standard_normal(n), 300, 2500) * .08 * (1 + .4 * np.sin(2 * np.pi * .7 * t))
     if kind == 'night': x = sum(np.sin(2 * np.pi * 4300 * t) * (np.sin(2 * np.pi * 28 * t) > .6) * ((t * .7 + k) % 1 < .3) for k in (0, .4)) * .015
     env = np.minimum(1, np.minimum(t / .8, (d - t) / .8)); x = x * env * g
-    add(amb, x, a - .5, 1, 0); add(amb, np.roll(x, 2000), a - .5, .7, .5)
+    add(amb, x, FW(a) - .5, 1, 0, raw=True); add(amb, np.roll(x, 2000), FW(a) - .5, .7, .5, raw=True)
 for kind, a, b, g in [('cave', 0, 7.6, 1), ('sea', 7.1, 19, .9), ('hall', 19, 30.8, 1), ('wind', 30.8, 42.6, .9), ('cave', 42.6, 62.4, 1), ('rain', 61.9, 72.8, 1.1), ('hall', 72.8, 77.8, 1), ('crowd', 77.8, 83.8, 1), ('wind', 83.8, 91.2, .5), ('night', 91.2, 101.5, 1)]:
     bed(kind, a, b, g)
 # drips in the cave, gulls at the beach, fire crackle in the hall
@@ -196,8 +208,11 @@ for v in VO:
     if not os.path.exists(p): continue
     x = readwav(p); x = X.compress(x / max(1e-6, np.abs(x).max()) * .8, .2, 3.5)
     x = x / np.sqrt((x ** 2).mean() + 1e-12) * .12
-    if v.get('dlg'): x = lp(x, 7000)
-    add(vox, x, v['t'], 1, 0)
+    if v.get('dlg'):   # the king, in the hall: darker, with a short stone-room echo
+        x = lp(x, 6000); d1 = int(.16 * SR); e = np.zeros(len(x) + 3 * d1); e[:len(x)] += x
+        for k, gk in ((1, .28), (2, .12), (3, .05)): e[k * d1:k * d1 + len(x)] += lp(x, 2500) * gk
+        x = e
+    add(vox, x, v['t'], 1, 0, raw=True)
 # duck music by ~10 dB under the voice (down only)
 from scipy.ndimage import uniform_filter1d
 env = uniform_filter1d(np.abs(vox[:, 0]), int(.25 * SR)); duck = 1 - .68 * np.clip(env / .05, 0, 1)

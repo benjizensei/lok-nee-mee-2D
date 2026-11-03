@@ -1,7 +1,7 @@
 // Perseus — vertical HD-2D film. render(t): pick shot → set → update → post (DOF + tilt-shift + bloom + grade) → 2D overlay
 import * as THREE from 'three';
 import { makePost } from './post_ts.js';
-import { DUR, shotAt, SET_OF } from './story.js';
+import { DUR_FILM, shotAt, SET_OF, toOrig } from './story.js';
 import { drawOverlay, overlayReady } from './ui.js';
 
 const W = 1080, H = 1920, Q = new URLSearchParams(location.search);
@@ -38,9 +38,9 @@ function tiltCenter(S, shot) {
   camera.updateMatrixWorld(); S.scene.updateMatrixWorld(); w.getWorldPosition(_v); _v.y += .9; _v.project(camera);
   return Math.min(.8, Math.max(.2, _v.y * .5 + .5));
 }
-window.DUR = DUR;
-window.render = t => {
-  const shot = shotAt(t), S = sets[SET_OF[shot.id]];
+window.DUR = DUR_FILM;
+window.render = tf => {
+  const t = toOrig(tf), shot = shotAt(t), S = sets[SET_OF[shot.id]];
   if (S) {
     post.dof.scene = S.scene;
     post.vig.uniforms.fade.value = 1; post.bloom.strength = .55; post.bloom.radius = .75; post.bloom.threshold = .85; renderer.toneMappingExposure = 1.15;
@@ -51,6 +51,6 @@ window.render = t => {
     if (Q.has('nodof')) { post.dof.maxCoc = 0; post.dof.tiltAmt = 0; }
     post.composer.render();
   } else { renderer.setRenderTarget(null); renderer.setClearColor('#000'); renderer.clear(); }
-  drawOverlay(t, shot);
+  drawOverlay(t, shot, tf);
 };
 window.READY = true;
