@@ -1,0 +1,6 @@
+Sun Wukong — the palm no one escapes (ซุนหงอคง: ฝ่ามือที่หนีไม่พ้น)
+Story: Journey to the West, chapters 1–7 (Wu Cheng'en, 16th century; public domain).
+Narration: the user's own recording.
+Picture: all sets, sprites, creatures, effects and UI drawn in code (three.js r170, MIT). No images or footage.
+Fonts (SIL Open Font License 1.1, Google Fonts, self-hosted in fonts/): Trirong, Taviraj (Cadson Demak), Cinzel (Natanael Gama).
+Music and sound: synthesized in code (numpy/scipy; pipa/guqin waveguide strings from the library's core/audio/pluck.py). No samples.
