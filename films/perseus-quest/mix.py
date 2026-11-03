@@ -226,7 +226,7 @@ act = env > .02
 db = lambda a: 20 * np.log10(np.sqrt((a ** 2).mean()) + 1e-12)
 print(f'voice vs bed while speaking: {db(vox[act]) - db(bedmix[act]):.1f} dB  (music {db(vox[act]) - db(mus[act] * duck[act, None] * MG):.1f}, sfx {db(vox[act]) - db(fol[act] * FG * duck2[act, None]):.1f}, amb {db(vox[act]) - db(amb[act] * AG * duck2[act, None]):.1f})')
 mix = bedmix + vox * 1.0
-for c in range(2): mix[:, c] = X.limit(mix[:, c], .8)
+for c in range(2): mix[:, c] = X.limit(mix[:, c], .65)
 mix = mix[:int(DUR * SR)]
 os.makedirs(os.path.join(HERE, 'out'), exist_ok=True)
 with wave.open(os.path.join(HERE, 'out/mix.wav'), 'wb') as w:
